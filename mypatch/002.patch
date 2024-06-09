@@ -1,0 +1,372 @@
+diff -urN /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/.config /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/.config
+--- /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/.config	2024-06-06 09:11:34.110273129 +0300
++++ /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/.config	2024-06-06 13:20:59.130991957 +0300
+@@ -1571,6 +1571,7 @@
+ CONFIG_DEVPORT=y
+ # CONFIG_TCG_TPM is not set
+ # CONFIG_XILLYBUS is not set
++CONFIG_TR1=m
+ # end of Character devices
+ 
+ #
+diff -urN /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/.config.old /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/.config.old
+--- /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/.config.old	2024-06-06 09:11:32.328273202 +0300
++++ /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/.config.old	2024-06-06 13:20:58.207991995 +0300
+@@ -29,7 +29,6 @@
+ CONFIG_BROKEN_ON_SMP=y
+ CONFIG_INIT_ENV_ARG_LIMIT=32
+ # CONFIG_COMPILE_TEST is not set
+-# CONFIG_WERROR is not set
+ CONFIG_LOCALVERSION=""
+ CONFIG_LOCALVERSION_AUTO=y
+ CONFIG_BUILD_SALT=""
+@@ -39,10 +38,6 @@
+ CONFIG_HAVE_KERNEL_LZO=y
+ CONFIG_HAVE_KERNEL_LZ4=y
+ CONFIG_KERNEL_GZIP=y
+-# CONFIG_KERNEL_LZMA is not set
+-# CONFIG_KERNEL_XZ is not set
+-# CONFIG_KERNEL_LZO is not set
+-# CONFIG_KERNEL_LZ4 is not set
+ CONFIG_DEFAULT_INIT=""
+ CONFIG_DEFAULT_HOSTNAME="(none)"
+ CONFIG_SYSVIPC=y
+@@ -1570,6 +1565,7 @@
+ CONFIG_DEVPORT=y
+ # CONFIG_TCG_TPM is not set
+ # CONFIG_XILLYBUS is not set
++CONFIG_TR1=m
+ # end of Character devices
+ 
+ #
+@@ -3139,4 +3135,11 @@
+ #
+ # end of Rust hacking
+ # end of Kernel hacking
++# CONFIG_KERNEL_LZ4 is not set
++# CONFIG_KERNEL_LZMA is not set
++# CONFIG_KERNEL_LZO is not set
++# CONFIG_KERNEL_XZ is not set
++# CONFIG_KERNEL_ZSTD is not set
++# CONFIG_KERNEL_UNCOMPRESSED is not set
+ # CONFIG_GCC_PLUGINS is not set
++# CONFIG_WERROR is not set
+diff -urN /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/drivers/char/Kconfig /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/drivers/char/Kconfig
+--- /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/drivers/char/Kconfig	2024-05-13 00:12:29.000000000 +0300
++++ /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/drivers/char/Kconfig	2024-06-06 13:19:38.891995247 +0300
+@@ -422,4 +422,10 @@
+ 	  and SSM (Silicon Secured Memory).  Intended consumers of this
+ 	  driver include crash and makedumpfile.
+ 
++config TR1
++	tristate "my module YISKA LEVI"
++	default m
++	help
++	 my module YISKA LEVI
++
+ endmenu
+diff -urN /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/drivers/char/Makefile /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/drivers/char/Makefile
+--- /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/drivers/char/Makefile	2024-05-13 00:12:29.000000000 +0300
++++ /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/drivers/char/Makefile	2024-06-06 13:19:53.082994665 +0300
+@@ -43,3 +43,4 @@
+ obj-$(CONFIG_XILLYBUS_CLASS)	+= xillybus/
+ obj-$(CONFIG_POWERNV_OP_PANEL)	+= powernv-op-panel.o
+ obj-$(CONFIG_ADI)		+= adi.o
++obj-$(CONFIG_TR1)		+= tr1.o
+diff -urN /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/drivers/char/tr1.c /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/drivers/char/tr1.c
+--- /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/drivers/char/tr1.c	1970-01-01 02:00:00.000000000 +0200
++++ /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/drivers/char/tr1.c	2024-06-05 13:07:08.706781777 +0300
+@@ -0,0 +1,277 @@
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/cdev.h>
++#include <linux/fs.h>
++#include <linux/device.h>
++#include <linux/version.h>
++#include <linux/wait.h>
++
++#define BUFFER_SIZE 4096
++
++DECLARE_WAIT_QUEUE_HEAD (mywq);
++static int nparam = 5;
++module_param(nparam, int, 0644);
++
++dev_t dev;
++int units = 2;
++
++
++static struct mod_priv {
++  struct cdev mod_cdev;
++  struct class *mod_cl;
++  struct device *mod_dev;
++  int buffer_size;
++  char buffer[BUFFER_SIZE];
++  int p_write;
++  int p_read;
++  wait_queue_head_t read_queue;
++  wait_queue_head_t write_queue;
++} mod_priv;
++
++
++static int my_open(struct inode *ino, struct file *filp);
++static int my_release(struct inode *ino, struct file *filp);
++static ssize_t my_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos);
++static ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos);
++
++static struct file_operations fops = {
++    .owner = THIS_MODULE,
++    .open = my_open,
++    .release = my_release,
++    .read = my_read,
++    .write = my_write,
++};
++static int __init trivmod_init (void)
++{
++  int err;
++
++  printk (KERN_INFO "triv_mod loaded\n");
++  err = alloc_chrdev_region (&dev, 0, units, "CourseDev");
++  if (err < 0)
++    goto dvr_err;
++  cdev_init (&mod_priv.mod_cdev, &fops);
++  err = cdev_add (&mod_priv.mod_cdev, dev, units);
++  if (err < 0)
++    goto cdev_err;
++  //mod_priv.mod_cl = class_create (THIS_MODULE, "CourseDev");
++  mod_priv.mod_cl = class_create ("CourseDev");
++  if (!mod_priv.mod_cl) {
++    err = -ENOMEM;
++    goto clc_err;
++  }
++  mod_priv.mod_dev = device_create (mod_priv.mod_cl, NULL, dev, NULL, "myDev");
++  if (!mod_priv.mod_dev) {
++    err = -ENOMEM;
++    goto dvc_err;
++  }
++  mod_priv.buffer_size=BUFFER_SIZE;
++  mod_priv.p_write=0;
++  mod_priv.p_read=0;
++  init_waitqueue_head (&mod_priv.read_queue);
++  init_waitqueue_head (&mod_priv.write_queue);
++  return 0;
++dvc_err:
++  class_destroy (mod_priv.mod_cl);
++clc_err:
++  cdev_del (&mod_priv.mod_cdev);
++cdev_err:
++  unregister_chrdev_region (dev, units);
++dvr_err:
++
++  return err;
++}
++
++static void __exit trivmod_exit (void)
++{
++  device_destroy (mod_priv.mod_cl, dev);
++  class_destroy (mod_priv.mod_cl);
++  cdev_del (&mod_priv.mod_cdev);
++  unregister_chrdev_region (dev, units);
++  printk (KERN_INFO "triv_mod unloaded\n");
++  return;
++}
++
++static int my_open(struct inode *ino, struct file *filp) {
++   
++    filp->private_data = container_of (ino->i_cdev,struct mod_priv, mod_cdev);
++    printk (KERN_INFO "my_open\n");
++    return 0;
++}
++
++static int my_release(struct inode *ino, struct file *filp) {
++    printk (KERN_INFO "my_release\n");
++    return 0;
++}
++
++
++static ssize_t my_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos) {
++    struct mod_priv *priv = filp->private_data;
++    ssize_t ret = 0; 
++    size_t available_data;
++     int isSignal;
++start_read:
++    // calculate available data
++    if (priv->p_read <= priv->p_write) {
++        available_data = priv->p_write - priv->p_read;
++    } else {
++        available_data = priv->buffer_size - priv->p_read + priv->p_write;
++    }
++
++    // if there's no data to read, return 0 
++    if (available_data == 0) {
++        if(filp->f_flags & O_NONBLOCK){
++            printk(KERN_INFO "You have reached the end of the file\n");
++            return 0;
++        }
++        else{
++            isSignal =wait_event_interruptible(priv->read_queue, priv->p_read != priv->p_write);
++            if(isSignal!=0){
++                printk(KERN_INFO "A signal was received and read was not completed\n");
++            return -EFAULT;
++            }
++            goto start_read;
++        }
++    }
++
++    // limit count to available data
++    if (count > available_data) {
++
++        if(filp->f_flags & O_NONBLOCK){
++            count = available_data;
++            printk(KERN_INFO "Not enough data to read. Available: %zu\n", available_data);
++        }
++        else{
++            if(count>priv->buffer_size){
++                printk(KERN_INFO "The count is greater than the buffer size: %zu\n", count);
++                return -EFAULT;
++            }
++            isSignal =wait_event_interruptible(priv->read_queue, (((priv->p_read <= priv->p_write)&&((priv->p_write - priv->p_read)>=count))||(!(priv->p_read <= priv->p_write)&&((priv->buffer_size - priv->p_read + priv->p_write)>=count))));
++            if(isSignal!=0){
++                printk(KERN_INFO "A signal was received and read was not completed\n");
++                return -EFAULT;
++            }
++            goto start_read;
++        }
++
++    }
++
++    // reading in circular
++    if (priv->p_read + count <= priv->buffer_size) {
++        if (copy_to_user(buf, priv->buffer + priv->p_read, count)) {
++            ret = -EFAULT;
++        } else {
++            priv->p_read = (priv->p_read + count) % priv->buffer_size;
++            ret = count;
++            printk(KERN_INFO "my_read: read %zu bytes\n", count);
++        }
++    } else {
++        size_t first_part = priv->buffer_size - priv->p_read;
++        size_t second_part = count - first_part;
++
++        if (copy_to_user(buf, priv->buffer + priv->p_read, first_part) ||
++            copy_to_user(buf + first_part, priv->buffer, second_part)) {
++            ret = -EFAULT;
++        } else {
++            priv->p_read = second_part;
++            ret = count;
++            printk(KERN_INFO "my_read: read %zu bytes\n", count);
++        }
++    }
++    
++    wake_up_interruptible (&priv->write_queue);
++    return ret;
++}
++
++
++static ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos) {
++    struct mod_priv *priv = filp->private_data;
++    ssize_t ret = 0;
++    size_t available_space;
++    size_t org_count=count;
++    int isSignal;
++start_write:
++    // calculate available space in buffer
++    if (priv->p_write >= priv->p_read) {
++        available_space = priv->buffer_size - priv->p_write + priv->p_read;
++    } else {
++        available_space = priv->p_read - priv->p_write;
++    }
++
++    // if there's no space to write, return 0 (buffer full)
++    if (available_space == 0) {
++        if(filp->f_flags & O_NONBLOCK){
++            printk(KERN_INFO "No space left in the buffer to write\n");
++            return 0;
++        }
++        else{
++            isSignal =wait_event_interruptible(priv->write_queue, ((priv->buffer_size - priv->p_write + priv->p_read)>0)||((priv->p_read - priv->p_write)>0));
++            if(isSignal!=0){
++                printk(KERN_INFO "A signal was received and read was not completed\n");
++                return -EFAULT;
++            }
++            goto start_write;
++        }
++    }
++
++    // limit count to available space
++    if (count > available_space) {
++        
++        if(filp->f_flags & O_NONBLOCK){
++            count = available_space;
++            printk(KERN_INFO "No space left in the buffer to write\n");
++        }
++        else{
++            if(count>priv->buffer_size){
++                printk(KERN_INFO "The count is greater than the buffer size: %zu\n", count);
++                return -EFAULT;
++            }
++            isSignal =wait_event_interruptible(priv->write_queue,(((priv->p_write >= priv->p_read)&&((priv->buffer_size - priv->p_write + priv->p_read)>=count))||(!(priv->p_write >= priv->p_read)&&((priv->p_read - priv->p_write)>=count))));
++            if(isSignal!=0){
++                printk(KERN_INFO "A signal was received and read was not completed\n");
++                return -EFAULT;
++            }
++            goto start_write;
++        }
++    }
++    // writing in circular manner
++    if (priv->p_write + count <= priv->buffer_size) {
++        if (copy_from_user(priv->buffer + priv->p_write, buf, count)) {
++            ret = -EFAULT;
++        } else {
++            priv->p_write = (priv->p_write + count) % priv->buffer_size;
++            ret = count;
++            printk(KERN_INFO "my_write: wrote %zu bytes\n", count);
++        }
++    } else {
++        size_t first_part = priv->buffer_size - priv->p_write;
++        size_t second_part = count - first_part;
++
++        if (copy_from_user(priv->buffer + priv->p_write, buf, first_part) ||
++            copy_from_user(priv->buffer, buf + first_part, second_part)) {
++            ret = -EFAULT;
++        } else {
++            priv->p_write = second_part;
++            ret = count;
++            printk(KERN_INFO "my_write: wrote %zu bytes\n", count);
++        }
++    }
++    // if less data was written than requested, return 0 and print the amount written
++    if (ret < org_count) {
++        printk(KERN_INFO "Not enough space to write. Available: %zu\n", available_space);
++        wake_up_interruptible (&priv->read_queue);
++        return 0;
++    }
++    printk(KERN_INFO "wake_up_interruptible read_queue\n");
++    wake_up_interruptible (&priv->read_queue);
++    return ret;
++}
++
++MODULE_LICENSE("GPL");
++MODULE_VERSION("0.1");
++MODULE_AUTHOR("Instructor");
++MODULE_PARM_DESC(nparam, "A numeric demonstration parameter");
++MODULE_DESCRIPTION("A trivial exercise module");
++
++module_init(trivmod_init);
++module_exit(trivmod_exit);
+Binary files /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/scripts/kconfig/conf and /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/scripts/kconfig/conf differ
+diff -urN /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/scripts/kconfig/.conf.cmd /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/scripts/kconfig/.conf.cmd
+--- /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/scripts/kconfig/.conf.cmd	2024-06-06 09:11:33.288273163 +0300
++++ /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/scripts/kconfig/.conf.cmd	2024-06-06 13:13:37.723010058 +0300
+@@ -1 +1 @@
+-savedcmd_scripts/kconfig/conf := /usr/bin/gcc -O2 -isystem /home/yiska/Downloads/buildroot-2024.02.2/output/host/include -L/home/yiska/Downloads/buildroot-2024.02.2/output/host/lib -Wl,-rpath,/home/yiska/Downloads/buildroot-2024.02.2/output/host/lib   -o scripts/kconfig/conf scripts/kconfig/conf.o scripts/kconfig/confdata.o scripts/kconfig/expr.o scripts/kconfig/lexer.lex.o scripts/kconfig/menu.o scripts/kconfig/parser.tab.o scripts/kconfig/preprocess.o scripts/kconfig/symbol.o scripts/kconfig/util.o   
++savedcmd_scripts/kconfig/conf := /usr/bin/gcc   -o scripts/kconfig/conf scripts/kconfig/conf.o scripts/kconfig/confdata.o scripts/kconfig/expr.o scripts/kconfig/lexer.lex.o scripts/kconfig/menu.o scripts/kconfig/parser.tab.o scripts/kconfig/preprocess.o scripts/kconfig/symbol.o scripts/kconfig/util.o   
+diff -urN /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/scripts/kconfig/.conf.o.cmd /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/scripts/kconfig/.conf.o.cmd
+--- /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9b/scripts/kconfig/.conf.o.cmd	2024-06-06 09:11:33.127273169 +0300
++++ /home/yiska/Downloads/buildroot-2024.02.3/output/build/linux-6.9/scripts/kconfig/.conf.o.cmd	2024-06-06 13:13:37.703010059 +0300
+@@ -1,4 +1,4 @@
+-savedcmd_scripts/kconfig/conf.o := /usr/bin/gcc -O2 -isystem /home/yiska/Downloads/buildroot-2024.02.2/output/host/include -L/home/yiska/Downloads/buildroot-2024.02.2/output/host/lib -Wl,-rpath,/home/yiska/Downloads/buildroot-2024.02.2/output/host/lib -Wp,-MMD,scripts/kconfig/.conf.o.d -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu11     -c -o scripts/kconfig/conf.o scripts/kconfig/conf.c
++savedcmd_scripts/kconfig/conf.o := /usr/bin/gcc -Wp,-MMD,scripts/kconfig/.conf.o.d -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu11     -c -o scripts/kconfig/conf.o scripts/kconfig/conf.c
+ 
+ source_scripts/kconfig/conf.o := scripts/kconfig/conf.c
+ 
