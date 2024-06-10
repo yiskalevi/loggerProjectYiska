@@ -2836,4 +2836,10 @@ menu "Text editors and viewers"
 	source "package/vim/Config.in"
 endmenu
 
+menu "Custom Packages"
+	source "package/my_server/Config.in"
+    
 endmenu
+
+endmenu
+

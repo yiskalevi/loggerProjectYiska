@@ -1,0 +1,7 @@
+config BR2_PACKAGE_MY_SERVER
+    bool "my_server"
+    help
+        UDP server package.
+
+        
+
